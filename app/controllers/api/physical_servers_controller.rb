@@ -41,35 +41,75 @@ module Api
     end
 
     def refresh_resource(type, id, _data = nil)
-      raise BadRequestError, "Must specify an id for refreshing a #{type} resource" unless id
+      refresh_physical_server("refresh_ems", type, id)
+    end
 
-      ensure_resource_exists(type, id) if single_resource?
-
-      api_action(type, id) do |klass|
-        physical_server = resource_search(id, type, klass)
-        api_log_info("Refreshing #{physical_server_ident(physical_server)}")
-        refresh_physical_server(physical_server)
-      end
+    def apply_config_pattern_resource(type, id, data)
+      apply_config(:apply_config_pattern, type, id, data)
     end
 
     private
 
-    def change_resource_state(state, type, id)
+    def change_resource_state(state, type, id, data = {})
       raise BadRequestError, "Must specify an id for changing a #{type} resource" unless id
 
       ensure_resource_exists(type, id) if single_resource?
-
       api_action(type, id) do |klass|
         begin
           server = resource_search(id, type, klass)
           desc = "Requested server state #{state} for #{server_ident(server)}"
-          api_log_info(desc)
-          task_id = queue_object_action(server, desc, :method_name => state, :role => :ems_operations)
-          action_result(true, desc, :task_id => task_id)
-        rescue => err
+          do_action(state, desc, server, data)
+        rescue StandardError => err
           action_result(false, err.to_s)
         end
       end
+    end
+
+    def refresh_physical_server(state, type, id)
+      raise BadRequestError, "Must specify an id for refreshing a #{type} resource" unless id
+
+      ensure_resource_exists(type, id) if single_resource?
+      api_action(type, id) do |klass|
+        begin
+          physical_server = resource_search(id, type, klass)
+          desc = "#{physical_server_ident(physical_server)} refreshing"
+          do_action(state, desc, physical_server)
+        rescue StandardError => err
+          action_result(false, err.to_s)
+        end
+      end
+    end
+
+    def apply_config(state, type, id, data = {})
+      raise BadRequestError, "Must specify an id for changing a #{type} resource" unless id
+
+      if single_resource?
+        ensure_resource_exists(type, id)
+        ensure_customization_script_exists(data["pattern_id"])
+      end
+
+      api_action(type, id) do |klass|
+        begin
+          ensure_customization_script_exists(data["pattern_id"])
+          server = resource_search(id, type, klass)
+          desc = "Requested server state #{state} for #{server_ident(server)}"
+          do_action(state, desc, server, data)
+        rescue StandardError => err
+          action_result(false, err.to_s)
+        end
+      end
+    end
+
+    def ensure_customization_script_exists(id)
+      ensure_resource_exists(:customization_scripts, id)
+    rescue NotFoundError
+      raise NotFoundError, "Customization script not found"
+    end
+
+    def do_action(state, desc, physical_server, data = {})
+      api_log_info(desc)
+      task_id = queue_object_action(physical_server, desc, :args => data, :method_name => state, :role => :ems_operations)
+      action_result(true, desc, :task_id => task_id)
     end
 
     def ensure_resource_exists(type, id)
@@ -78,14 +118,6 @@ module Api
 
     def server_ident(server)
       "Server instance: #{server.id} name:'#{server.name}'"
-    end
-
-    def refresh_physical_server(physical_server)
-      desc = "#{physical_server_ident(physical_server)} refreshing"
-      task_id = queue_object_action(physical_server, desc, :method_name => "refresh_ems", :role => "ems_operations")
-      action_result(true, desc, :task_id => task_id)
-    rescue => err
-      action_result(false, err.to_s)
     end
 
     def physical_server_ident(physical_server)

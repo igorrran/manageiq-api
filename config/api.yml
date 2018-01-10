@@ -922,6 +922,18 @@
       :delete:
       - :name: delete
         :identifier: ab_group_delete
+  :customization_scripts:
+    :description: Customization Script
+    :identifier: customization_script
+    :options:
+    - :collection
+    :verbs: *g
+    :klass: CustomizationScript
+    :subcollections:
+    :collection_actions:
+      :get:
+      - :name: read
+        :identifier: customization_script_show_list
   :data_stores:
     :description: Datastores
     :identifier: storage
@@ -1613,6 +1625,8 @@
         :identifier: physical_server_turn_on_loc_led
       - :name: turn_off_loc_led
         :identifier: physical_server_turn_off_loc_led
+      - :name: apply_config_pattern
+        :identifier: physical_server_apply_config_pattern
     :resource_actions:
       :get:
       - :name: read
@@ -1640,6 +1654,8 @@
         :identifier: physical_server_turn_on_loc_led
       - :name: turn_off_loc_led
         :identifier: physical_server_turn_off_loc_led
+      - :name: apply_config_pattern
+        :identifier: physical_server_apply_config_pattern
   :pictures:
     :description: Pictures
     :options:
